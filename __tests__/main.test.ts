@@ -7,7 +7,16 @@ import * as core from '../__fixtures__/core.js'
 const paginate = jest.fn()
 const request = jest.fn()
 const getOctokit = jest.fn(() => ({ paginate, request }))
-const context = { repo: { owner: 'acme' } }
+const context = {
+  repo: { owner: 'acme' },
+  payload: {
+    repository: {
+      owner: {
+        type: 'Organization'
+      }
+    }
+  }
+}
 
 jest.unstable_mockModule('@actions/core', () => core)
 jest.unstable_mockModule('@actions/github', () => ({ context, getOctokit }))
@@ -38,6 +47,8 @@ describe('main.ts', () => {
 
   afterEach(async () => {
     await fs.rm(tempDir, { recursive: true, force: true })
+    context.repo.owner = 'acme'
+    context.payload.repository.owner.type = 'Organization'
     jest.useRealTimers()
     jest.resetAllMocks()
   })
@@ -180,6 +191,51 @@ describe('main.ts', () => {
         package_type: 'container',
         package_name: 'apps/api',
         package_version_id: 5
+      }
+    )
+  })
+
+  it('uses authenticated-user routes for the current user namespace', async () => {
+    context.repo.owner = 'benja'
+    context.payload.repository.owner.type = 'User'
+    mockInputs({
+      'github-token': 'token',
+      'max-age-days': '30',
+      'min-versions-to-keep': '0',
+      'dry-run': 'false',
+      source: '',
+      owner: '',
+      'owner-type': '',
+      'package-names': '',
+      'root-directory': tempDir,
+      'deploy-config-path': 'config/deploy.yml',
+      'image-regex': ''
+    })
+    paginate
+      .mockResolvedValueOnce([{ name: 'apps/api' }])
+      .mockResolvedValueOnce([version(8, '2026-05-01T00:00:00Z')])
+
+    await run()
+
+    expect(paginate).toHaveBeenNthCalledWith(1, 'GET /user/packages', {
+      package_type: 'container',
+      per_page: 100
+    })
+    expect(paginate).toHaveBeenNthCalledWith(
+      2,
+      'GET /user/packages/{package_type}/{package_name}/versions',
+      {
+        package_type: 'container',
+        package_name: 'apps/api',
+        per_page: 100
+      }
+    )
+    expect(request).toHaveBeenCalledWith(
+      'DELETE /user/packages/{package_type}/{package_name}/versions/{package_version_id}',
+      {
+        package_type: 'container',
+        package_name: 'apps/api',
+        package_version_id: 8
       }
     )
   })

@@ -16,7 +16,7 @@ import {
 } from './cleanup.js'
 
 type Octokit = ReturnType<typeof github.getOctokit>
-type OwnerType = 'org' | 'user'
+type OwnerType = 'org' | 'user' | 'authenticated-user'
 type OwnerTypeInput = OwnerType | 'auto'
 type Source = 'deploy-configs' | 'owner'
 
@@ -207,9 +207,16 @@ function getSourceInput(): Source {
 function getOwnerTypeInput(): OwnerTypeInput {
   const value = core.getInput('owner-type') || 'auto'
 
-  if (value === 'auto' || value === 'org' || value === 'user') return value
+  if (
+    value === 'auto' ||
+    value === 'org' ||
+    value === 'user' ||
+    value === 'authenticated-user'
+  ) {
+    return value
+  }
 
-  throw new Error('owner-type must be auto, org, or user')
+  throw new Error('owner-type must be auto, org, user, or authenticated-user')
 }
 
 function getIntegerInput(name: string): number {
@@ -252,6 +259,20 @@ async function listVersions(
     }
   }
 
+  if (preferredOwnerType === 'authenticated-user') {
+    return {
+      ownerType: 'authenticated-user',
+      versions: await listAuthenticatedUserVersions(octokit, packageName)
+    }
+  }
+
+  if (isCurrentUserNamespace(owner)) {
+    return {
+      ownerType: 'authenticated-user',
+      versions: await listAuthenticatedUserVersions(octokit, packageName)
+    }
+  }
+
   try {
     return {
       ownerType: 'org',
@@ -283,6 +304,20 @@ async function listPackages(
     return {
       ownerType: 'user',
       packages: await listUserPackages(octokit, owner)
+    }
+  }
+
+  if (ownerType === 'authenticated-user') {
+    return {
+      ownerType: 'authenticated-user',
+      packages: await listAuthenticatedUserPackages(octokit, owner)
+    }
+  }
+
+  if (isCurrentUserNamespace(owner)) {
+    return {
+      ownerType: 'authenticated-user',
+      packages: await listAuthenticatedUserPackages(octokit, owner)
     }
   }
 
@@ -333,6 +368,21 @@ async function listUserPackages(
   }))
 }
 
+async function listAuthenticatedUserPackages(
+  octokit: Octokit,
+  owner: string
+): Promise<CleanupTarget[]> {
+  const packages = (await octokit.paginate('GET /user/packages', {
+    package_type: 'container',
+    per_page: 100
+  })) as PackageSummary[]
+
+  return packages.map(({ name }) => ({
+    owner,
+    packageName: name
+  }))
+}
+
 async function listOrgVersions(
   octokit: Octokit,
   owner: string,
@@ -365,6 +415,20 @@ async function listUserVersions(
   )) as PackageVersion[]
 }
 
+async function listAuthenticatedUserVersions(
+  octokit: Octokit,
+  packageName: string
+): Promise<PackageVersion[]> {
+  return (await octokit.paginate(
+    'GET /user/packages/{package_type}/{package_name}/versions',
+    {
+      package_type: 'container',
+      package_name: packageName,
+      per_page: 100
+    }
+  )) as PackageVersion[]
+}
+
 async function deleteVersion(
   octokit: Octokit,
   ownerType: OwnerType,
@@ -385,6 +449,18 @@ async function deleteVersion(
     return
   }
 
+  if (ownerType === 'authenticated-user') {
+    await octokit.request(
+      'DELETE /user/packages/{package_type}/{package_name}/versions/{package_version_id}',
+      {
+        package_type: 'container',
+        package_name: packageName,
+        package_version_id: versionId
+      }
+    )
+    return
+  }
+
   await octokit.request(
     'DELETE /users/{username}/packages/{package_type}/{package_name}/versions/{package_version_id}',
     {
@@ -393,6 +469,13 @@ async function deleteVersion(
       package_name: packageName,
       package_version_id: versionId
     }
+  )
+}
+
+function isCurrentUserNamespace(owner: string): boolean {
+  return (
+    github.context.repo.owner.toLowerCase() === owner.toLowerCase() &&
+    github.context.payload.repository?.owner?.type === 'User'
   )
 }
 

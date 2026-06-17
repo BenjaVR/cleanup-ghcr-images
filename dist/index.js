@@ -63252,9 +63252,13 @@ function getSourceInput() {
 }
 function getOwnerTypeInput() {
     const value = getInput('owner-type') || 'auto';
-    if (value === 'auto' || value === 'org' || value === 'user')
+    if (value === 'auto' ||
+        value === 'org' ||
+        value === 'user' ||
+        value === 'authenticated-user') {
         return value;
-    throw new Error('owner-type must be auto, org, or user');
+    }
+    throw new Error('owner-type must be auto, org, user, or authenticated-user');
 }
 function getIntegerInput(name) {
     const value = getInput(name, { required: true });
@@ -63285,6 +63289,18 @@ async function listVersions(octokit, owner, packageName, preferredOwnerType = 'a
             versions: await listUserVersions(octokit, owner, packageName)
         };
     }
+    if (preferredOwnerType === 'authenticated-user') {
+        return {
+            ownerType: 'authenticated-user',
+            versions: await listAuthenticatedUserVersions(octokit, packageName)
+        };
+    }
+    if (isCurrentUserNamespace(owner)) {
+        return {
+            ownerType: 'authenticated-user',
+            versions: await listAuthenticatedUserVersions(octokit, packageName)
+        };
+    }
     try {
         return {
             ownerType: 'org',
@@ -63311,6 +63327,18 @@ async function listPackages(octokit, owner, ownerType) {
         return {
             ownerType: 'user',
             packages: await listUserPackages(octokit, owner)
+        };
+    }
+    if (ownerType === 'authenticated-user') {
+        return {
+            ownerType: 'authenticated-user',
+            packages: await listAuthenticatedUserPackages(octokit, owner)
+        };
+    }
+    if (isCurrentUserNamespace(owner)) {
+        return {
+            ownerType: 'authenticated-user',
+            packages: await listAuthenticatedUserPackages(octokit, owner)
         };
     }
     try {
@@ -63350,6 +63378,16 @@ async function listUserPackages(octokit, owner) {
         packageName: name
     }));
 }
+async function listAuthenticatedUserPackages(octokit, owner) {
+    const packages = (await octokit.paginate('GET /user/packages', {
+        package_type: 'container',
+        per_page: 100
+    }));
+    return packages.map(({ name }) => ({
+        owner,
+        packageName: name
+    }));
+}
 async function listOrgVersions(octokit, owner, packageName) {
     return (await octokit.paginate('GET /orgs/{org}/packages/{package_type}/{package_name}/versions', {
         org: owner,
@@ -63366,10 +63404,25 @@ async function listUserVersions(octokit, owner, packageName) {
         per_page: 100
     }));
 }
+async function listAuthenticatedUserVersions(octokit, packageName) {
+    return (await octokit.paginate('GET /user/packages/{package_type}/{package_name}/versions', {
+        package_type: 'container',
+        package_name: packageName,
+        per_page: 100
+    }));
+}
 async function deleteVersion(octokit, ownerType, owner, packageName, versionId) {
     if (ownerType === 'org') {
         await octokit.request('DELETE /orgs/{org}/packages/{package_type}/{package_name}/versions/{package_version_id}', {
             org: owner,
+            package_type: 'container',
+            package_name: packageName,
+            package_version_id: versionId
+        });
+        return;
+    }
+    if (ownerType === 'authenticated-user') {
+        await octokit.request('DELETE /user/packages/{package_type}/{package_name}/versions/{package_version_id}', {
             package_type: 'container',
             package_name: packageName,
             package_version_id: versionId
@@ -63382,6 +63435,10 @@ async function deleteVersion(octokit, ownerType, owner, packageName, versionId) 
         package_name: packageName,
         package_version_id: versionId
     });
+}
+function isCurrentUserNamespace(owner) {
+    return (context.repo.owner.toLowerCase() === owner.toLowerCase() &&
+        context.payload.repository?.owner?.type === 'User');
 }
 function setSummaryOutputs(imagesFound, versionsFound, versionsEligible, versionsDeleted) {
     setOutput('images-found', imagesFound);

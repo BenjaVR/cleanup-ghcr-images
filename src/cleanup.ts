@@ -14,7 +14,7 @@ export interface PackageImage {
 }
 
 export interface CleanupTarget extends PackageImage {
-  ownerType?: 'org' | 'user'
+  ownerType?: 'org' | 'user' | 'authenticated-user'
 }
 
 export interface PackageVersion {

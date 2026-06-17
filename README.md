@@ -127,7 +127,7 @@ shape. Prefer a named capture group called `image`.
 | `dry-run`              | `false`                                       | Report deletions without deleting package versions.                                              |
 | `source`               | `owner`                                       | Where to discover images. Use `owner` or `deploy-configs`.                                       |
 | `owner`                | Current repository owner                      | Organization or user to scan when `source` is `owner`.                                           |
-| `owner-type`           | `auto`                                        | Owner namespace type. Use `auto`, `org`, or `user`.                                              |
+| `owner-type`           | `auto`                                        | Owner namespace type. Use `auto`, `org`, `user`, or `authenticated-user`.                        |
 | `package-names`        |                                               | Optional comma-separated or newline-separated package names to include in `owner` mode.          |
 | `root-directory`       | `.`                                           | Directory to scan for deploy config files when `source` is `deploy-configs`.                     |
 | `deploy-config-path`   | `**/config/deploy{,.*}.{yml,yaml}`            | Relative deploy config glob to match under the root directory when `source` is `deploy-configs`. |
@@ -151,7 +151,9 @@ fields.
 
 For each selected package, the action lists package versions through the GitHub
 REST API. With `owner-type: auto`, it first tries the organization package route
-and falls back to the user package route on a `404`.
+and falls back to the user package route on a `404`. For personal repositories
+owned by the authenticated user, it uses GitHub's authenticated-user package
+routes.
 
 A package version is deleted only when both conditions are true:
 

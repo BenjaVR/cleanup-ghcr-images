@@ -37,7 +37,8 @@ inputs:
       repository owner.
     required: false
   owner-type:
-    description: Owner namespace type. Use auto, org, or user.
+    description:
+      Owner namespace type. Use auto, org, user, or authenticated-user.
     required: false
     default: auto
   package-names:
