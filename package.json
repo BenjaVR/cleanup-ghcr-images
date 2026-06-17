@@ -1,17 +1,17 @@
 {
-  "name": "typescript-action",
-  "description": "GitHub Actions TypeScript template",
+  "name": "cleanup-ghcr-images",
+  "description": "Configurable GitHub Action for deleting old GHCR image versions",
   "version": "0.0.0",
-  "author": "",
+  "author": "bvrcode",
   "type": "module",
   "private": true,
-  "homepage": "https://github.com/actions/typescript-action",
+  "homepage": "https://github.com/BenjaVR/cleanup-ghcr-images",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/actions/typescript-action.git"
+    "url": "git+https://github.com/BenjaVR/cleanup-ghcr-images.git"
   },
   "bugs": {
-    "url": "https://github.com/actions/typescript-action/issues"
+    "url": "https://github.com/BenjaVR/cleanup-ghcr-images/issues"
   },
   "keywords": [
     "actions"
@@ -37,7 +37,9 @@
   },
   "license": "MIT",
   "dependencies": {
-    "@actions/core": "^3.0.0"
+    "@actions/core": "^3.0.0",
+    "@actions/github": "^9.1.1",
+    "minimatch": "^10.2.5"
   },
   "devDependencies": {
     "@eslint/compat": "^2.0.2",

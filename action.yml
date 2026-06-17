@@ -1,23 +1,74 @@
-name: The name of your action here
-description: Provide a description here
-author: Your name or organization here
+name: Cleanup GHCR images
+description:
+  Delete old GitHub Container Registry package versions discovered from deploy
+  config files or an owner namespace.
+author: bvrcode
 
-# Add your action's branding here. This will appear on the GitHub Marketplace.
 branding:
-  icon: heart
-  color: red
+  icon: trash-2
+  color: gray-dark
 
-# Define your inputs here.
 inputs:
-  milliseconds:
-    description: Your input description here
+  github-token:
+    description: GitHub token with packages:write permission.
     required: true
-    default: '1000'
+    default: ${{ github.token }}
+  max-age-days:
+    description: Delete only versions older than this many days.
+    required: true
+    default: '30'
+  min-versions-to-keep:
+    description: Always keep at least this many newest versions per package.
+    required: true
+    default: '10'
+  dry-run:
+    description: Report deletions without deleting package versions.
+    required: false
+    default: 'false'
+  source:
+    description:
+      Where to discover images. Use `deploy-configs` for Kamal-style config
+      files or `owner` for every container package in an owner namespace.
+    required: false
+    default: owner
+  owner:
+    description:
+      Organization or user to scan when source is owner. Defaults to the current
+      repository owner.
+    required: false
+  owner-type:
+    description: Owner namespace type. Use auto, org, or user.
+    required: false
+    default: auto
+  package-names:
+    description:
+      Optional comma-separated or newline-separated package names to include
+      when source is owner.
+    required: false
+  root-directory:
+    description: Directory to scan for deploy config files.
+    required: false
+    default: .
+  deploy-config-path:
+    description: Relative deploy config glob to match under the root directory.
+    required: false
+    default: '**/config/deploy{,.*}.{yml,yaml}'
+  image-regex:
+    description:
+      Regular expression used to extract the image. Prefer a named capture group
+      called image.
+    required: false
+    default: '^image:\s*["'']?(?<image>[^"''\s#]+)["'']?\s*$'
 
-# Define your outputs here.
 outputs:
-  time:
-    description: Your output description here
+  images-found:
+    description: Number of unique GHCR images discovered.
+  versions-found:
+    description: Number of package versions listed across discovered images.
+  versions-eligible:
+    description: Number of package versions eligible for deletion.
+  versions-deleted:
+    description: Number of package versions actually deleted.
 
 runs:
   using: node24
